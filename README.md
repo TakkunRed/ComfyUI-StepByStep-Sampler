@@ -23,7 +23,8 @@ Visualizes the image list output from the `STEP_IMAGES` socket of the `Step-by-S
 
 ### 3. Step-by-Step Comparer
 A side-by-side visualization tool for the `STEP_IMAGES` output. It allows you to compare two different steps (e.g., Step 5 vs. Step 20) using an interactive split-screen slider.
-
+![Node Screenshot](images/StepByStepImage.png)
+<img src="images/StepByStepImage.png" width="50%">
 ## Installation
 Manual Install
 ```
@@ -54,5 +55,8 @@ git clone https://github.com/TakkunRed/ComfyUI-StepByStep-Sampler.git
         PSNR → ∞ (Higher dB means closer to previous step; 40dB+ is a typical convergence target)
         SSIM → 1.0 (Structural Similarity Index; 0.99+ is a typical convergence target)
         ```
+* `auto_stop`: Enable/Disable automatic convergence stop
+* `stop_threshhold`: Threshold for determining convergence
+
 ## License
 MIT
