@@ -1,6 +1,6 @@
 # ComfyUI-StepByStep-Sampler
 
-A set of custom nodes for ComfyUI designed to analyze and compare the image generation process step-by-step. It quantifies changes in latent variables (using metrics like PSNR/SSIM) and provides a dedicated viewer for intuitive inspection.
+A set of custom nodes for ComfyUI designed to analyze and compare the image generation process step-by-step. It quantifies changes in latent variables (using metrics like PSNR/SSIM) and provides a dedicated viewer for intuitive inspection. Furthermore, since sampling automatically stops once image generation converges, image generation can be performed with the optimal number of steps.
 
 [![GitHub license](https://github.com/TakkunRed/ComfyUI-StepByStep-Sampler)](https://github.com/TakkunRed/ComfyUI-StepByStep-Sampler/blob/main/LICENSE)
 [![ComfyUI](https://img.shields.io/badge/ComfyUI-Custom_Nodes-blue)](https://github.com/comfyanonymous/ComfyUI)
@@ -11,20 +11,19 @@ A set of custom nodes for ComfyUI designed to analyze and compare the image gene
 
 ### 1. Step-by-Step Sampler
 Hooks into the generation process to capture intermediate images at specified intervals by VAE encoding the latent state. It can be integrated with `Preview Image` or `Save Image` nodes to display or output the progression as a sequence.
-
 Calculates the amount of change from the previous step using MSE, RMSE, L1, PSNR, or SSIM, allowing you to monitor convergence numerically.
-
 Draws step counts and difference values directly onto the images, making it easy to track the step number and the delta from the preceding frame.
-
+Since sampling automatically stops once image generation converges, image generation can be performed with the optimal number of steps.
 Outputs the final result as a standard `LATENT` (similar to KSampler), but can also output the VAE-encoded image via the `LAST_IMAGE` socket.
 
 ### 2. Step-by-Step Player
 Visualizes the image list output from the `STEP_IMAGES` socket of the `Step-by-Step Sampler`. Use the slider or the Play button to view the generation process as an animation.
+<img src="images/StepByStepImage.png" width="50%">
 
 ### 3. Step-by-Step Comparer
 A side-by-side visualization tool for the `STEP_IMAGES` output. It allows you to compare two different steps (e.g., Step 5 vs. Step 20) using an interactive split-screen slider.
-![Node Screenshot](images/StepByStepImage.png)
-<img src="images/StepByStepImage.png" width="50%">
+<img src="images/comparer.png">
+
 ## Installation
 Manual Install
 ```
