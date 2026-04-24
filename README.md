@@ -40,6 +40,7 @@ git clone https://github.com/TakkunRed/ComfyUI-StepByStep-Sampler.git
 * Add the Step-by-Step Sampler node.
 * Connect `model`, `positive`, `negative`, `latent_image`, and `vae` to the respective inputs.
 * Connect the `STEP_IMAGES` output to the `StepStepPlayer` or `StepStepComparer` node. You can also connect it to `Preview Image` or `Save Image`.
+* Turning on `auto_stop` will stop sampling based on the `stop_threshold`.
 * Run Queue Prompt as usual, and the generation process will appear in the viewers.
 
 ### Viewer Controls
