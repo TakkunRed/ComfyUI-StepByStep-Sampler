@@ -16,6 +16,8 @@ Draws step counts and difference values directly onto the images, making it easy
 Since sampling automatically stops once image generation converges, image generation can be performed with the optimal number of steps.
 Outputs the final result as a standard `LATENT` (similar to KSampler), but can also output the VAE-encoded image via the `LAST_IMAGE` socket.
 
+<img src="images/StepByStep_Sampler.png">
+
 ### 2. Step-by-Step Player
 Visualizes the image list output from the `STEP_IMAGES` socket of the `Step-by-Step Sampler`. Use the slider or the Play button to view the generation process as an animation.
 
