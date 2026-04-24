@@ -1,66 +1,53 @@
-# ComfyUI-StepByStep-Sampler
+# ComfyUI-Metadata-Inspector
 
-A set of custom nodes for ComfyUI designed to analyze and compare the image generation process step-by-step. It quantifies changes in latent variables (using metrics like PSNR/SSIM) and provides a dedicated viewer for intuitive inspection. Furthermore, since sampling automatically stops once image generation converges, image generation can be performed with the optimal number of steps.
+A specialized suite of custom nodes for ComfyUI designed to hunt down and visualize generation parameters (prompts, steps, samplers, etc.) embedded in AI-generated images. It works across different formats and platforms (ComfyUI, Automatic1111, Civitai, and more).
 
-[![GitHub license](https://img.shields.io/github.com/TakkunRed/ComfyUI-StepByStep-Sampler)](https://github.com/TakkunRed/ComfyUI-StepByStep-Sampler/blob/main/LICENSE)
+[![GitHub license](https://img.shields.io/github/license/TakkunRed/ComfyUI-Metadata-Inspector)](https://github.com/TakkunRed/ComfyUI-Metadata-Inspector/blob/main/LICENSE)
 [![ComfyUI](https://img.shields.io/badge/ComfyUI-Custom_Nodes-blue)](https://github.com/comfyanonymous/ComfyUI)
+
+## Core Mission
+The primary goal of this tool is to **reveal hidden prompt strings and workflow structures** from AI-generated content. Whether it's a PNG with a complex node graph or a JPEG with a text-based prompt hidden in EXIF data, this inspector brings it to light.
 
 ![Node Screenshot](images/workflow_image.png)
 
-## Node description
+## Node Descriptions
 
-### 1. Step-by-Step Sampler
-Hooks into the generation process to capture intermediate images at specified intervals by VAE encoding the latent state. It can be integrated with `Preview Image` or `Save Image` nodes to display or output the progression as a sequence.
-Calculates the amount of change from the previous step using MSE, RMSE, L1, PSNR, or SSIM, allowing you to monitor convergence numerically.
-Draws step counts and difference values directly onto the images, making it easy to track the step number and the delta from the preceding frame.
-Since sampling automatically stops once image generation converges, image generation can be performed with the optimal number of steps.
-Outputs the final result as a standard `LATENT` (similar to KSampler), but can also output the VAE-encoded image via the `LAST_IMAGE` socket.
+This extension includes three essential nodes to complete the inspection workflow:
 
-<img src="images/StepByStep_Sampler.png">
+### 1. Load Image w/ Name
+- **Purpose**: Provides a flexible way to load images.
+- **Function**: Unlike the standard loader, it allows you to input a filename via string or absolute path, making it easier to integrate with dynamic file-handling workflows.
 
-### 2. Step-by-Step Player
-Visualizes the image list output from the `STEP_IMAGES` socket of the `Step-by-Step Sampler`. Use the slider or the Play button to view the generation process as an animation.
+### 2. Extract Metadata (The Core)
+- **Purpose**: The "brain" that scans the image file for generation data.
+- **Function**: 
+    - **PNG Deep Scan**: Extracts full ComfyUI/A1111 prompt and workflow JSONs.
+    - **JPEG/EXIF Recovery**: Deep-scans EXIF sub-IFDs to find hidden `UserComment` and `ImageDescription` tags often used by Civitai and Tensor.art.
+    - **Smart JSON Recovery**: Detects JSON structures even when they are buried inside plain-text metadata.
 
-<img src="images/StepByStepImage.png" width="50%">
+### 3. JSON Tree Viewer (Web UI)
+- **Purpose**: Provides a human-readable visualization of the raw data.
+- **Function**: Transforms the raw metadata string into an interactive, foldable tree view directly on the ComfyUI canvas. It highlights potential prompt areas in orange for quick identification.
 
-### 3. Step-by-Step Comparer
-A side-by-side visualization tool for the `STEP_IMAGES` output. It allows you to compare two different steps (e.g., Step 5 vs. Step 20) using an interactive split-screen slider.
-
-<img src="images/comparer.png">
+## Key Features
+- **Hidden Prompt Extraction**: Recovers data from JPEGs where standard tools fail.
+- **Workflow Reconstruction Support**: Outputs raw JSON strings that can be used to understand complex node setups.
+- **Multi-Platform Compatibility**: Supports metadata formats from ComfyUI, Automatic1111, and various web-based generators.
 
 ## Installation
-Manual Install
-```
-Bash
+
+### Manual Install
+```bash
 cd ComfyUI/custom_nodes
-git clone https://github.com/TakkunRed/ComfyUI-StepByStep-Sampler.git
+git clone https://github.com/TakkunRed/ComfyUI-Metadata-Inspector.git
 ```
+
 ## How to Use
-### Workflow Integration
-* Add the Step-by-Step Sampler node.
-* Connect `model`, `positive`, `negative`, `latent_image`, and `vae` to the respective inputs.
-* Connect the `STEP_IMAGES` output to the `StepStepPlayer` or `StepStepComparer` node. You can also connect it to `Preview Image` or `Save Image`.
-* Turning on `auto_stop` will stop sampling based on the `stop_threshold`.
-* Run Queue Prompt as usual, and the generation process will appear in the viewers.
 
-### Viewer Controls
-* `Player`: Change steps using the bottom slider or use the "Play" button for auto-playback.
-* `Comparer`: Select two steps to compare using the sliders, and drag the vertical bar on the image to reveal the differences between side A and side B.
-
-### Step-by-Step Sampler Settings
-* `save_interval`: Determines how often images are saved (e.g., set to 1 to capture every step).
-* `show_overlay`: Toggles the on-image display of step numbers and difference metrics.
-* `diff_method`: Selects the algorithm for calculating step-to-step changes:
-    * Metric Characteristics (at convergence):
-        ```
-        MSE → 0 (Emphasizes large changes)
-        RMSE → 0 (MSE scaled back to L1 range)
-        L1 → 0 (Simple, robust against outliers)
-        PSNR → ∞ (Higher dB means closer to previous step; 40dB+ is a typical convergence target)
-        SSIM → 1.0 (Structural Similarity Index; 0.99+ is a typical convergence target)
-        ```
-* `auto_stop`: Enable/Disable automatic convergence stop
-* `stop_threshhold`: Threshold for determining convergence
+1. Place Load Image w/ Name.
+2. Connect it to Extract Metadata.
+3. Connect the metadata_json output to JSON Tree Viewer.
+4. Input your image path and run the queue to see the hidden prompt data.
 
 ## License
 MIT
