@@ -18,10 +18,12 @@ Outputs the final result as a standard `LATENT` (similar to KSampler), but can a
 
 ### 2. Step-by-Step Player
 Visualizes the image list output from the `STEP_IMAGES` socket of the `Step-by-Step Sampler`. Use the slider or the Play button to view the generation process as an animation.
+
 <img src="images/StepByStepImage.png" width="50%">
 
 ### 3. Step-by-Step Comparer
 A side-by-side visualization tool for the `STEP_IMAGES` output. It allows you to compare two different steps (e.g., Step 5 vs. Step 20) using an interactive split-screen slider.
+
 <img src="images/comparer.png">
 
 ## Installation
