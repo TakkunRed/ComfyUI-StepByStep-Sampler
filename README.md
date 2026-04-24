@@ -2,7 +2,7 @@
 
 A set of custom nodes for ComfyUI designed to analyze and compare the image generation process step-by-step. It quantifies changes in latent variables (using metrics like PSNR/SSIM) and provides a dedicated viewer for intuitive inspection. Furthermore, since sampling automatically stops once image generation converges, image generation can be performed with the optimal number of steps.
 
-[![GitHub license](https://github.com/TakkunRed/ComfyUI-StepByStep-Sampler)](https://github.com/TakkunRed/ComfyUI-StepByStep-Sampler/blob/main/LICENSE)
+[![GitHub license](https://img.shields.io/github.com/TakkunRed/ComfyUI-StepByStep-Sampler)](https://github.com/TakkunRed/ComfyUI-StepByStep-Sampler/blob/main/LICENSE)
 [![ComfyUI](https://img.shields.io/badge/ComfyUI-Custom_Nodes-blue)](https://github.com/comfyanonymous/ComfyUI)
 
 ![Node Screenshot](images/workflow_image.png)
