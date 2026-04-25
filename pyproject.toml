@@ -1,7 +1,7 @@
 [project]
 name = "ComfyUI-StepByStep-Sampler"
 description = "ComfyUI StepByStep Sampler is a plugin for ComfyUI that provides a step-by-step sampling method for image generation. It allows users to generate images in a more controlled and iterative manner, making it easier to achieve desired results."
-version = "1.0.0"
+version = "1.0.1"
 readme = "README.md"
 license = {file = "LICENSE"}
 dependencies = []
