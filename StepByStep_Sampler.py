@@ -2,13 +2,11 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-import nodes
 import comfy.samplers
 import comfy.sample
 import comfy.utils
 import comfy.model_management
 import latent_preview
-from server import PromptServer
 
 DIFF_METHODS = ["MSE", "RMSE", "L1", "PSNR", "SSIM"]
 
@@ -45,7 +43,10 @@ class StepByStepSampler:
             # ---- 早期停止パラメータ ----
             "auto_stop":     ("BOOLEAN", {"default": False, "label_on": "ON",  "label_off": "OFF"}),
             "stop_threshold":("FLOAT",  {"default": 0.0001, "min": 0.0, "max": 100.0,
-                                          "step": 0.0001, "round": False}),
+                                          "step": 0.0001, "round": False,
+                                          "tooltip": "MSE/RMSE/L1: この値以下で停止 / "
+                                                     "PSNR(dB)・SSIM: この値以上で停止 "
+                                                     "(目安: PSNR 40, SSIM 0.99)"}),
         }}
 
     RETURN_TYPES  = ("LATENT", "IMAGE",       "IMAGE",      "INT")
@@ -116,11 +117,27 @@ class StepByStepSampler:
         その他は値が小さいほど近い（threshold 以下で収束）。
         """
         if method == "PSNR":
-            return diff_value != float("inf") and diff_value >= threshold
+            return diff_value >= threshold  # inf（前ステップと完全一致）は収束済み
         elif method == "SSIM":
             return diff_value >= threshold
         else:
             return diff_value <= threshold
+
+    def _threshold_is_sane(self, threshold, method):
+        """
+        PSNR / SSIM は「大きいほど近い」ため、MSE 系のしきい値（0.0001 等）のままだと
+        2 ステップ目で必ず停止してしまう。明らかに不適切な値のときは早期停止を行わない。
+        """
+        if method == "PSNR":
+            return threshold >= 10.0
+        if method == "SSIM":
+            return threshold >= 0.5
+        return True
+
+    @staticmethod
+    def _to_uint8(img):
+        """[1,H,W,C] float(0..1) -> uint8。全ステップ分を保持するためメモリを 1/4 にする"""
+        return (img.clamp(0.0, 1.0) * 255.0).round().to(torch.uint8)
 
     # ------------------------------------------------------------------ #
     #  テキストオーバーレイ
@@ -163,8 +180,11 @@ class StepByStepSampler:
                auto_stop=False, stop_threshold=0.0001):
 
         latent = latent_image["samples"]
-        latent = comfy.sample.fix_empty_latent_channels(
-            model, latent, latent_image.get("downscale_ratio_spacial", None))
+        try:
+            latent = comfy.sample.fix_empty_latent_channels(
+                model, latent, latent_image.get("downscale_ratio_spacial", None))
+        except TypeError:  # 古い ComfyUI（引数が 2 つのバージョン）
+            latent = comfy.sample.fix_empty_latent_channels(model, latent)
 
         batch_inds = latent_image.get("batch_index", None)
         noise      = comfy.sample.prepare_noise(latent, seed, batch_inds)
@@ -172,23 +192,26 @@ class StepByStepSampler:
 
         preview_callback = latent_preview.prepare_callback(model, steps)
 
-        self.step_images   = []
+        step_images        = []            # uint8。インスタンスには保持しない（実行後にメモリが残らない）
         last_saved_step    = [-1]
         prev_x0_cpu        = [None]
         stopped_at         = [steps]       # 実際に停止したステップ数（1始まり）
-        last_x0_proc       = [None]        # 早期停止時の最終 x0 を保持
+        latest_x0          = [None]        # 直近ステップの x0（早期停止時の最終結果に使う）
+
+        use_auto_stop = auto_stop
+        if auto_stop and not self._threshold_is_sane(stop_threshold, diff_method):
+            print(f"[StepSampler] auto_stop is disabled: stop_threshold={stop_threshold} is not "
+                  f"suitable for {diff_method} (PSNR needs >= 10 dB e.g. 40, SSIM needs >= 0.5 e.g. 0.99).")
+            use_auto_stop = False
 
         def callback(step, x0, x, total_steps):
             preview_callback(step, x0, x, total_steps)
-
-            is_interval = (step % save_interval == 0)
-            is_last     = (step == total_steps - 1)
-            should_save = (is_interval or is_last) and (step != last_saved_step[0])
 
             with torch.no_grad():
                 # スケール変換（差分計算・早期停止判定に毎ステップ必要）
                 x0_proc = self._process_x0(model, x0)
                 x0_cpu  = x0_proc.cpu()
+                latest_x0[0] = x0_proc
 
                 # 差分計算（CPU）
                 diff_value = None
@@ -199,10 +222,22 @@ class StepByStepSampler:
                     diff_str   = self._format_diff(diff_value, diff_method)
                 prev_x0_cpu[0] = x0_cpu
 
-                # 保存対象ステップの処理
+                # ---- 早期停止判定 ----
+                # ・auto_stop が ON（かつしきい値が手法に対して妥当）
+                # ・diff_value が計算済み（= 2ステップ目以降）
+                # ・収束条件を満たした
+                # ・最終ステップでない（最終ステップは通常終了させる）
+                will_stop = (use_auto_stop and diff_value is not None
+                             and self._converged(diff_value, stop_threshold, diff_method)
+                             and step < total_steps - 1)
+
+                # 保存対象ステップの処理（停止するステップは間隔に関係なく必ず保存する）
+                is_interval = (step % save_interval == 0)
+                is_last     = (step == total_steps - 1)
+                should_save = (is_interval or is_last or will_stop) and (step != last_saved_step[0])
+
                 if should_save:
                     last_saved_step[0] = step
-                    last_x0_proc[0]    = x0_proc  # 最後に保存した x0 を記録
 
                     try:
                         decoded = self._safe_decode(vae, x0_proc).cpu()
@@ -214,16 +249,9 @@ class StepByStepSampler:
                         label = f"Step {step + 1}/{total_steps}  {diff_method}: {diff_str}"
                         img   = self._annotate(decoded, label) if show_overlay \
                                 else decoded[0:1].cpu()
-                        self.step_images.append(img)
+                        step_images.append(self._to_uint8(img))
 
-                # ---- 早期停止判定 ----
-                # ・auto_stop が ON
-                # ・diff_value が計算済み（= 2ステップ目以降）
-                # ・収束条件を満たした
-                # ・最終ステップでない（最終ステップは通常終了させる）
-                if (auto_stop and diff_value is not None
-                        and self._converged(diff_value, stop_threshold, diff_method)
-                        and step < total_steps - 1):
+                if will_stop:
                     stopped_at[0] = step + 1  # 1始まりで記録
                     print(f"[StepSampler] Early stop at step {step + 1}/{total_steps} "
                           f"({diff_method}={diff_str} threshold={stop_threshold})")
@@ -236,7 +264,6 @@ class StepByStepSampler:
         #  早期停止時は _EarlyStop 例外が raise される。
         #  その場合 samples は得られないので、最後に保存した x0 を代わりに使う。
         # ------------------------------------------------------------------ #
-        early_stopped = False
         try:
             samples = comfy.sample.sample(
                 model, noise, steps, cfg, sampler_name, scheduler,
@@ -245,17 +272,14 @@ class StepByStepSampler:
                 callback=callback, disable_pbar=disable_pbar, seed=seed,
             )
         except _EarlyStop:
-            early_stopped = True
-            # 早期停止時は最後に保存した x0_proc をサンプルとして使う
-            if last_x0_proc[0] is not None:
-                samples = last_x0_proc[0].to(latent.device)
-            else:
-                samples = latent  # フォールバック
+            # 早期停止時は停止したステップの x0（処理済み）をサンプルとして使う
+            samples = latest_x0[0].to(latent.device) if latest_x0[0] is not None else latent
 
         # ------------------------------------------------------------------ #
         #  出力整形
         # ------------------------------------------------------------------ #
         latent_out = latent_image.copy()
+        latent_out.pop("downscale_ratio_spacial", None)  # 標準の KSampler と同じ
         latent_out["samples"] = samples
 
         # LAST_IMAGE：最終サンプル結果を VAE デコード（オーバーレイなし）
@@ -265,13 +289,14 @@ class StepByStepSampler:
             print(f"[StepSampler] final decode failed: {e}")
             last_image = torch.zeros(1, 64, 64, 3)
 
-        if not self.step_images:
+        if not step_images:
             label     = f"Step {stopped_at[0]}/{steps}  {diff_method}: -"
             step_imgs = self._annotate(last_image, label) if show_overlay \
                         else last_image[0:1]
             return (latent_out, step_imgs, last_image, stopped_at[0])
 
-        return (latent_out, torch.cat(self.step_images, dim=0), last_image, stopped_at[0])
+        step_imgs = torch.cat(step_images, dim=0).float() / 255.0
+        return (latent_out, step_imgs, last_image, stopped_at[0])
 
     # ------------------------------------------------------------------ #
     #  ユーティリティ（後方互換）

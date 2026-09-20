@@ -8,7 +8,7 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "StepByStepGridSampler": "Step-by-Step Sampler",
+    "StepByStepSampler": "Step-by-Step Sampler",
     "StepStepPlayer": "Step-by-Step Player",
     "StepStepComparer": "Step-by-Step Comparer"
 }
